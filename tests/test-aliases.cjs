@@ -60,6 +60,27 @@ fresh.settings = { aliasFile: path.join(base, 'nobody', 'vault-aliases.json') };
 fresh.readAliases(); fresh.applyTitle();
 assert.equal(fresh.currentAlias(), 'Work docs'); assert.equal(document.title, 'note - Work docs - Obsidian');
 
+// Renaming or removing the alias updates a title that already shows the old alias.
+fresh.setAlias(here, 'Mine'); assert.equal(document.title, 'note - Mine - Obsidian');
+fresh.setAlias(here, 'Mine 2'); assert.equal(document.title, 'note - Mine 2 - Obsidian');
+fresh.setAlias(here, ''); assert.equal(document.title, 'note - Work docs - Obsidian');
+
+// Titles Obsidian builds for separate windows carry the alias; an open Settings window follows changes.
+const settingsDoc = { title: 'Settings - Docs - Obsidian' };
+const hooks = [];
+fresh.register = (fn) => hooks.push(fn);
+fresh.app.title = 'Docs - Obsidian';
+Object.getPrototypeOf(fresh.app).getAppTitle = function (t) { return t ? t + ' - ' + this.title : this.title; };
+fresh.patchAppTitle();
+assert.equal(fresh.app.getAppTitle('Settings'), 'Settings - Work docs - Obsidian');
+fresh.app.setting = { popout: { win: { closed: false, document: settingsDoc } } };
+fresh.setAlias(here, 'Mine 3');
+assert.equal(settingsDoc.title, 'Settings - Mine 3 - Obsidian'); assert.equal(document.title, 'note - Mine 3 - Obsidian');
+fresh.onunload(); hooks.forEach((fn) => fn());
+assert.equal(settingsDoc.title, 'Settings - Docs - Obsidian'); assert.equal(document.title, 'note - Docs - Obsidian');
+assert.equal(fresh.app.getAppTitle('Settings'), 'Settings - Docs - Obsidian');
+fresh.setAlias(here, '');
+
 // An empty or damaged vault alias file is ignored; an empty alias is never written.
 fs.writeFileSync(path.join(other, '.obsidian', 'vault-alias.json'), '{ not json');
 const error = console.error; console.error = () => {};
@@ -68,4 +89,4 @@ assert.equal(plugin.writeOwnVaultAlias('   '), false);
 
 assert.deepEqual(notices, []);
 fs.rmSync(base, { recursive: true, force: true });
-console.log('PASS: lookup order, vault-own alias store, reset fallback');
+console.log('PASS: lookup order, vault-own alias store, reset fallback, window titles');

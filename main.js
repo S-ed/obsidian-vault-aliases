@@ -8,9 +8,10 @@
  *
  * Shared file format: { "version": 1, "aliases": { "<vault path>": "<alias>" } }
  *
- * Relies on two Obsidian internals (checked against the installed build):
+ * Relies on Obsidian internals (checked against the installed build):
  *   - ipcRenderer "vault-list" / "vault" / "vault-open"
  *   - the sidebar element .workspace-drawer-vault-switcher / .workspace-drawer-vault-name
+ *   - app.getAppTitle and app.setting.popout, for the titles of separate windows such as Settings
  */
 'use strict';
 
@@ -48,7 +49,9 @@ class VaultAliasesPlugin extends Plugin {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     this.aliases = {};
     this.originalLabel = null;
+    this.shownTitleName = null;
     this.readAliases();
+    this.patchAppTitle();
 
     this.addSettingTab(new VaultAliasesSettingTab(this.app, this));
 
@@ -66,11 +69,9 @@ class VaultAliasesPlugin extends Plugin {
 
   onunload() {
     if (this.titleObserver) this.titleObserver.disconnect();
-    const alias = this.currentAlias();
-    const name = this.currentBasename();
     const label = document.querySelector('.workspace-drawer-vault-name');
     if (label && this.originalLabel !== null) label.setText(this.originalLabel);
-    if (alias && alias !== name) document.title = this.swapTitle(document.title, alias, name);
+    this.setTitles(this.currentBasename());
   }
 
   // ---- shared alias file ----
@@ -250,21 +251,57 @@ class VaultAliasesPlugin extends Plugin {
     if (label.textContent !== want) label.setText(want);
   }
 
-  swapTitle(title, from, to) {
-    // Obsidian's title is "<note> - <vault> - Obsidian vX"; replace the vault segment.
-    const parts = title.split(' - ');
+  // Obsidian's titles are "<note> - <vault> - Obsidian vX". Replace the vault segment, which holds
+  // either the folder name or the name this plugin put there earlier, with `to`.
+  swapTitle(title, to) {
+    const from = [this.shownTitleName, this.currentBasename()].filter((n) => n && n !== to);
+    const parts = String(title).split(' - ');
     for (let i = parts.length - 1; i >= 0; i--) {
-      if (parts[i] === from) { parts[i] = to; return parts.join(' - '); }
+      if (from.includes(parts[i])) { parts[i] = to; return parts.join(' - '); }
     }
     return title;
   }
 
+  // The main window, plus the separate Settings window of newer Obsidian builds while it is open.
+  titleDocuments() {
+    const docs = [document];
+    try {
+      const setting = this.app.setting;
+      const win = setting && setting.popout && setting.popout.win;
+      if (win && !win.closed && win.document) docs.push(win.document);
+    } catch (e) { /* internal layout differs in this build; the main window is still handled */ }
+    return docs;
+  }
+
+  setTitles(name) {
+    for (const doc of this.titleDocuments()) {
+      const next = this.swapTitle(doc.title, name);
+      if (next !== doc.title) doc.title = next;
+    }
+    this.shownTitleName = name;
+  }
+
   applyTitle() {
-    const alias = this.currentAlias();
-    const name = this.currentBasename();
-    if (!alias || alias === name) return;
-    const next = this.swapTitle(document.title, name, alias);
-    if (next !== document.title) document.title = next;
+    this.setTitles(this.currentAlias() || this.currentBasename());
+  }
+
+  // Newer Obsidian builds name separate windows (Settings) through app.getAppTitle. Wrap it so
+  // those titles carry the alias from the start. Skipped where the function does not exist.
+  patchAppTitle() {
+    const app = this.app;
+    if (typeof app.getAppTitle !== 'function') return;
+    const plugin = this;
+    const original = app.getAppTitle;
+    const hadOwn = Object.prototype.hasOwnProperty.call(app, 'getAppTitle');
+    const patched = function (...args) {
+      const title = original.apply(this, args);
+      try { return plugin.swapTitle(title, plugin.currentAlias() || plugin.currentBasename()); } catch (e) { return title; }
+    };
+    app.getAppTitle = patched;
+    this.register(() => {
+      if (app.getAppTitle !== patched) return;
+      if (hadOwn) app.getAppTitle = original; else delete app.getAppTitle;
+    });
   }
 }
 

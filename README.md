@@ -15,7 +15,7 @@ Obsidian names every vault after its folder, so several vaults whose folder is c
 
 - **Vault switcher** (the menu at the bottom of the left sidebar): lists every vault by its alias. The plugin replaces Obsidian's menu with its own, built from the same vault list, with the current vault checked and a **Manage vaults...** entry at the end.
 - **Vault name label** at the bottom-left of the window.
-- **Window title**: the vault part of `<note> - <vault> - Obsidian`.
+- **Window title**: the vault part of `<note> - <vault> - Obsidian`, including the separate Settings window of newer Obsidian versions.
 
 The **Manage vaults** window is not changed, because plugins do not run there. It shows each vault's path.
 
@@ -82,11 +82,12 @@ Your own aliases are stored in one JSON file outside all vaults, so that every v
 ## Limits and fragility
 
 - **Desktop only.** It uses Node and Electron, which Obsidian mobile does not have.
-- **Tested on Windows only**, against one Obsidian build (minimum app version in the manifest: 1.5.0).
+- **Tested on Windows and Linux** (Linux: Obsidian 1.15.1 under WSL). Not tested on macOS. Minimum app version in the manifest: 1.5.0.
 - **It relies on Obsidian internals that are not public API**:
   - the `vault-list`, `vault` and `vault-open` IPC calls;
   - the sidebar elements `.workspace-drawer-vault-switcher` and `.workspace-drawer-vault-name`;
-  - the format of the window title.
+  - the format of the window title;
+  - `app.getAppTitle` and `app.setting.popout`, for the title of the separate Settings window. Where these do not exist, only that window's title is left alone.
 
   An Obsidian update can break any of these. After updating, check that the vault switcher still opens and switches vaults. Disabling the plugin restores Obsidian's own behaviour at once.
 - The plugin's switcher menu lists vaults and **Manage vaults...** only. Anything else Obsidian puts in its own menu is not reproduced.
@@ -101,6 +102,7 @@ Plain JavaScript in a single file; edit `main.js` and copy it to a vault's plugi
 
 ## Changes
 
+- **1.1.2**: the window title follows at once when an alias is renamed or removed; the separate Settings window of newer Obsidian versions shows the alias in its title; checked on Linux.
 - **1.1.1**: the save button asks before replacing a different alias the vault already carries; shorter introduction on the settings page, with a hint on removing a vault's own alias.
 - **1.1.0**: a vault can carry its own alias in `vault-alias.json`, used when you have no alias of your own for it; reset and save buttons on the settings page.
 - **1.0.0**: aliases in the vault switcher, the vault name label and the window title; one shared alias file, by default in Obsidian's per-user settings folder.
