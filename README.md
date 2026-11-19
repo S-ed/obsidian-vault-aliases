@@ -8,6 +8,9 @@ Obsidian names every vault after its folder, so several vaults whose folder is c
 | --- | --- |
 | ![Vault switcher listing three vaults all named Documentation](docs/switcher-without-plugin.png) | ![Vault switcher listing the same vaults by their aliases](docs/switcher-with-plugin.png) |
 
+> [!WARNING]
+> Obsidian has no public API for vault names, so this plugin relies on Obsidian internals. An Obsidian update can stop it working. Disabling the plugin restores Obsidian's own behaviour at once. Details: [Limits and fragility](#limits-and-fragility).
+
 ## What it changes
 
 - **Vault switcher** (the menu at the bottom of the left sidebar): lists every vault by its alias. The plugin replaces Obsidian's menu with its own, built from the same vault list, with the current vault checked and a **Manage vaults...** entry at the end.
